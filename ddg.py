@@ -1,8 +1,8 @@
 from typing import List, TypeVar, Iterable
 from cmath import phase
-from math import sin
+from math import sin, factorial
 from sympy import Point as spPoint, Triangle
-
+import numpy as np
 
 
 int_float = TypeVar('int_float', int, float)
@@ -37,6 +37,9 @@ class Point:
 
     def complex_phase(self):
         return phase(complex(self))
+
+    def __abs__(self):
+        return (self.x**2+self.y**2)**.5
 
     def __sub__(self, other):
         return Point(self.x - other.x, self.y - other.y)
@@ -220,8 +223,80 @@ class DiscretePlaneCurve:
     def center_of_mass(self):
         return sum(self.points, start=Point(0, 0)) / len(self.points)
 
+    def get_evolute(self, curvature_function, normal_vector_function):
+        return DiscretePlaneCurve([self.points[i] + (1/curvature_function(self, i)) * normal_vector_function(self, i) for i in range(len(self))], is_closed=self.is_closed)
+
+    @staticmethod
+    def fixed_curvature(curvature_function, frac1, frac2):
+        if frac1 is None or frac2 is None:
+            return lambda self, i: curvature_function(self, i)
+        return lambda self, i : curvature_function(self, i) / (abs(self.nth_edge_vector(i-1)) * frac1 + abs(self.nth_edge_vector(i)) * frac2)
+
+    def get_curvatures_from_function(self, curvature_function):
+        relevant_length = len(self)
+        if not self.is_closed:
+            relevant_length -= 2
+        return [curvature_function(self, i) for i in range(relevant_length)]
+        
+
     def __len__(self):
         return self.point_number if self.is_closed else self.point_number - 1
-    
 
 
+def get_vec_at_ind(vec, ind):
+    return vec[ind % len(vec)]
+
+def get_param_set(start, end, num_points):
+    return np.linspace(start, end, num=num_points+1)[:-1]
+
+def discretize(lambdax, lambday, start, end, num_points):
+    params = get_param_set(start, end, num_points)
+    return DiscretePlaneCurve([Point(lambdax(t), lambday(t)) for t in params], is_closed=True)
+
+# Assumes circular data
+def discrete_derivative(info_xs, info_ys, order, position):
+    info_xs = list(info_xs)
+    info_ys = list(info_ys)
+    rate = info_xs[1] - info_xs[0]
+    #print(info_xs)
+    #print(info_ys)
+
+    if order % 2 == 0:
+        n = order // 2
+        hs = [#-get_vec_at_ind(info_xs, position) + get_vec_at_ind(info_xs, position + i)
+                rate*i
+                        for i in range(-n, n+1)]
+        matrix = []
+
+        for i in range(order+1):
+            if i == 0:
+                matrix.append([1 for _ in range(order+1)])
+            else:
+                matrix.append([hs[j]**i for j in range(order+1)])
+        
+        matrix = np.array(matrix)
+        vec = np.reshape(np.array([0 for _ in range(order)] + [factorial(order)]), (order+1, 1))
+
+        coeffs = np.matmul(np.linalg.inv(matrix), vec)
+
+        return sum(coeffs[i][0] * get_vec_at_ind(info_ys, position+i-n) for i in range(order+1))
+    else:
+        n = order // 2 + 1
+        hs = [#-get_vec_at_ind(info_xs, position) + get_vec_at_ind(info_xs, position + i)
+              rate * i
+                     for i in range(-n, n+1) if i != 0]
+        matrix = []
+
+        for i in range(order+1):
+            if i == 0:
+                matrix.append([1 for _ in range(order+1)])
+            else:
+                matrix.append([hs[j]**i for j in range(order+1)])
+        
+        matrix = np.array(matrix)
+        vec = np.reshape(np.array([0 for _ in range(order)] + [factorial(order)]), (order+1, 1))
+
+        coeffs = np.matmul(np.linalg.inv(matrix), vec)
+        #print(coeffs)
+
+        return sum(coeffs[i][0] * get_vec_at_ind(info_ys, position-n+(i+1 if i >= n else i)) for i in range(order+1))
