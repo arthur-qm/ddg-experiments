@@ -12,10 +12,11 @@ from math import sin, cos, pi
 class EvoluteFigure(Scene):
     def construct(self):
 
-        for n_points in range(4, 33):
+        for n_points in range(5, 17):
 
-            curve = ddg.discretize(lambda t: 2 * cos(t), lambda t: 1 * sin(t), 0, 2*pi, n_points)
-            evolute = curve.get_evolute(ddg.DiscretePlaneCurve.fixed_curvature(ddg.DiscretePlaneCurve.nth_half_sin_curvature, .5, .5), ddg.DiscretePlaneCurve.nth_angle_bisector)
+            # curve = ddg.discretize(lambda t: t if t <= 1 else 2-t, lambda t: (t - t**3)**.5 if t <= 1 else -((2-t) - ((2-t)**3))**.5, 0, 2, n_points)
+            curve = ddg.discretize(lambda t: t, lambda t: t**3, -1, 0.99, n_points)
+            evolute = curve.get_evolute(ddg.DiscretePlaneCurve.nth_circumradius_curvature, ddg.DiscretePlaneCurve.nth_unit_vector_along_circumcenter)
 
             curve_dots = [Dot(radius=0.05, color=BLUE).move_to([p.x, p.y, 0]) for p in curve.points]
             evolute_dots = [Dot(radius=0.03, color=RED).move_to([p.x, p.y, 0]) for p in evolute.points]

@@ -48,7 +48,7 @@ class Point:
         return Point(self.x + other.x, self.y + other.y)
 
     def __mul__(self, other):
-        if type(other) == int or type(other) == float:
+        if type(other) == int or type(other) == float or type(other) == np.float64:
             return Point(self.x * other, self.y * other)
         else:
             return self.x * other.x + self.y * other.y
@@ -209,7 +209,9 @@ class DiscretePlaneCurve:
         if not self.is_closed:
             relevant_length -= 2
         
-        return DiscretePlaneCurve([self.points[i] + ((time_step * self.nth_half_sin_curvature(i)) * self.nth_angle_bisector(i)) for i in range(relevant_length)], 
+        fixed_half_sin = DiscretePlaneCurve.fixed_curvature(DiscretePlaneCurve.nth_half_sin_curvature, 1/2, 1/2)
+
+        return DiscretePlaneCurve([self.points[i] + ((time_step * fixed_half_sin(self, i)) * self.nth_angle_bisector(i)) for i in range(relevant_length)], 
                                    is_closed=self.is_closed)
 
     def timestep_from_circumradius_curvature(self, time_step=0.01):
@@ -242,6 +244,20 @@ class DiscretePlaneCurve:
     def __len__(self):
         return self.point_number if self.is_closed else self.point_number - 1
 
+    def discrete_derivative(self, function, order=0):
+        if order == 0:
+            return function
+        else:
+            function_prime = lambda i: ((function(i+1)-function(i))/(self.nth_point(i).dist(self.nth_point(i+1)))
+                            + (function(i)-function(i-1))/self.nth_point(i-1).dist(self.nth_point(i))
+            )/2
+            return self.discrete_derivative(function_prime, order=order-1) 
+
+    def length_sum_function(self):
+        L = [0]
+        for i in range(len(self)-1):
+            L.append(self.nth_point(i).dist(self.nth_point(i+1))+L[-1])
+        return L
 
 def get_vec_at_ind(vec, ind):
     return vec[ind % len(vec)]
